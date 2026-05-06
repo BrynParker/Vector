@@ -23,13 +23,45 @@ window.WORLDVIEW_CONFIG = {
 };
 ```
 
-## Run
+## Local Run
 
 ```bash
 npm install
 npm run server
 npm run dev
 ```
+
+## Ubuntu VM Deployment (Ubuntu 24.04+)
+
+1. Bootstrap machine dependencies and service templates:
+
+```bash
+sudo bash deploy/ubuntu/setup.sh
+```
+
+2. Clone repo and install app dependencies:
+
+```bash
+sudo -u worldview -H bash -lc 'cd /opt && git clone <YOUR_REPO_URL> worldviewer'
+sudo -u worldview -H bash -lc 'cd /opt/worldviewer && npm install && npm run build'
+```
+
+3. Create environment file:
+
+```bash
+sudo cp /opt/worldviewer/deploy/ubuntu/worldviewer.env.example /etc/worldviewer.env
+sudo nano /etc/worldviewer.env
+```
+
+4. Start services:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart worldviewer-feed worldviewer-web nginx
+sudo systemctl status worldviewer-feed worldviewer-web nginx
+```
+
+The app is served through Nginx on port `80`, with `/ws` proxied to the WebSocket feed gateway on port `8787`.
 
 ## Implemented now
 
