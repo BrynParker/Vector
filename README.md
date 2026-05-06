@@ -1,10 +1,43 @@
-# WorldViewerDupe — Ubuntu 26.04 Pterodactyl Egg Install Guide
+# WorldViewerDupe
 
-This document intentionally contains **only** the full install/setup process for running this project inside a **Pterodactyl egg** on **Ubuntu 26.04**, starting immediately after first VM boot.
+Cesium + Google Photorealistic 3D Tiles base app with a real server-side feed gateway for:
+
+- OpenSky aircraft positions.
+- CelesTrak satellite set + live position updates.
+
+## Architecture (current)
+
+- `server/index.js`: WebSocket gateway (`/ws`) and polling loops.
+- `server/adapters.js`: OpenSky + CelesTrak adapters and normalization.
+- `server/orbit.js`: temporary orbit approximation from TLE identity.
+- `src/main.js`: Cesium viewer + real-time WebSocket layer updates.
+
+## Configure
+
+In `index.html`:
+
+```html
+window.WORLDVIEW_CONFIG = {
+  googleMapsApiKey: "YOUR_GOOGLE_MAPS_API_KEY",
+  wsUrl: "ws://localhost:8787/ws"
+};
+```
+
+## Local Run
+
+```bash
+npm install
+npm run server
+npm run dev
+```
+
+## Ubuntu 26.04 Pterodactyl Egg — Full Install Guide
+
+Step-by-step setup for running this project inside a **Pterodactyl egg** on **Ubuntu 26.04**, starting immediately after first VM boot.
 
 ---
 
-## 1) First boot (root shell on fresh Ubuntu 26.04 VM)
+### 1) First boot (root shell on fresh Ubuntu 26.04 VM)
 
 ```bash
 sudo -i
@@ -24,7 +57,7 @@ sudo -i
 
 ---
 
-## 2) Install every package used by this setup (explicitly)
+### 2) Install every package used by this setup (explicitly)
 
 ```bash
 apt-get update
@@ -65,7 +98,7 @@ apt-get install -y \
 
 ---
 
-## 3) Install Node.js 22.x and npm
+### 3) Install Node.js 22.x and npm
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -76,7 +109,7 @@ npm -v
 
 ---
 
-## 4) Install PM2 globally
+### 4) Install PM2 globally
 
 ```bash
 npm install -g pm2
@@ -85,7 +118,7 @@ pm2 -v
 
 ---
 
-## 5) Create dedicated runtime user + app directory
+### 5) Create dedicated runtime user + app directory
 
 ```bash
 id -u worldview >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash worldview
@@ -95,7 +128,7 @@ chown -R worldview:worldview /opt/worldviewer
 
 ---
 
-## 6) Clone repository and install dependencies
+### 6) Clone repository and install dependencies
 
 Replace `<YOUR_GIT_URL>` with your repo URL.
 
@@ -105,9 +138,22 @@ sudo -u worldview -H bash -lc 'cd /opt/worldviewer && npm install'
 sudo -u worldview -H bash -lc 'cd /opt/worldviewer && npm run build'
 ```
 
+Alternatively, use the provided bootstrap script:
+
+```bash
+sudo bash deploy/ubuntu/setup.sh
+```
+
 ---
 
-## 7) Create runtime environment file
+### 7) Create runtime environment file
+
+```bash
+sudo cp /opt/worldviewer/deploy/ubuntu/worldviewer.env.example /etc/worldviewer.env
+sudo nano /etc/worldviewer.env
+```
+
+Or create it manually:
 
 ```bash
 cat >/etc/worldviewer.env <<'EOF_ENV'
@@ -121,9 +167,9 @@ chmod 600 /etc/worldviewer.env
 
 ---
 
-## 8) Install systemd service files
+### 8) Install systemd service files
 
-### Feed gateway service
+#### Feed gateway service
 
 ```bash
 cat >/etc/systemd/system/worldviewer-feed.service <<'EOF_SVC'
@@ -152,7 +198,7 @@ WantedBy=multi-user.target
 EOF_SVC
 ```
 
-### Frontend preview service
+#### Frontend preview service
 
 ```bash
 cat >/etc/systemd/system/worldviewer-web.service <<'EOF_SVC'
@@ -183,7 +229,7 @@ EOF_SVC
 
 ---
 
-## 9) Install Nginx site configuration
+### 9) Install Nginx site configuration
 
 ```bash
 cat >/etc/nginx/sites-available/worldviewer <<'EOF_NGX'
@@ -223,7 +269,7 @@ nginx -t
 
 ---
 
-## 10) Enable firewall rules
+### 10) Enable firewall rules
 
 ```bash
 ufw allow OpenSSH
@@ -234,7 +280,7 @@ ufw status
 
 ---
 
-## 11) Start services and verify
+### 11) Start services and verify
 
 ```bash
 systemctl daemon-reload
@@ -255,7 +301,7 @@ curl -sS http://127.0.0.1/health
 
 ---
 
-## 12) Pterodactyl egg startup command
+### 12) Pterodactyl egg startup command
 
 Inside the Pterodactyl egg/server startup command, use:
 
@@ -267,10 +313,51 @@ If you run the web frontend in the same egg process model, use a process manager
 
 ---
 
-## 13) Upgrade procedure (same Ubuntu 26.04 VM)
+### 13) Upgrade procedure
 
 ```bash
 sudo -i
 sudo -u worldview -H bash -lc 'cd /opt/worldviewer && git pull && npm install && npm run build'
 systemctl restart worldviewer-feed worldviewer-web nginx
 ```
+
+---
+
+## Implemented now
+
+- Real backend polling of OpenSky.
+- Real backend refresh of CelesTrak TLE set.
+- Continuous WebSocket push (`aircraft_batch`, `satellite_batch`).
+- Frontend upsert of live aircraft/satellite entities on Cesium globe.
+
+## Next integrations
+
+- ADS-B Exchange adapter (server-side).
+- SGP4 propagation (`satellite.js`) replacing approximation logic.
+- OSM traffic particle layer.
+- Austin CCTV catalog + stream projection layer.
+- Post-process shader chain (CRT/NVG/FLIR/Anime as true shader passes).
+
+## Ubuntu Version Recommendation (as of 2026-05-06)
+
+If choosing from:
+
+1. Ubuntu 22.04 LTS (Jammy)
+2. Ubuntu 24.04 LTS (Noble)
+3. Ubuntu 25.10 (Questing Quokka)
+4. Ubuntu 26.04 LTS (Resolute Raccoon)
+
+**Best default choice for this project: Ubuntu 26.04 LTS.**
+
+Why:
+
+- It is the latest LTS release (released April 23, 2026), so you get the newest stable kernel/userspace with long-term support.
+- It avoids interim-release churn from 25.10 while being newer than 24.04.
+- It gives the longest forward maintenance runway for a new deployment.
+
+When to choose 24.04 instead:
+
+- If your cloud provider image catalog or internal compliance baseline has not yet fully validated 26.04.
+- If a vendor driver/toolchain you require explicitly certifies 24.04 but not yet 26.04.
+
+Avoid 25.10 for production unless you specifically need an interim-only feature.
