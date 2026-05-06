@@ -1,0 +1,22 @@
+[Unit]
+Description=WorldViewer Vite Preview Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=worldview
+Group=worldview
+WorkingDirectory=/opt/worldviewer
+EnvironmentFile=/etc/worldviewer.env
+ExecStart=/usr/bin/npm run preview -- --host 127.0.0.1 --port 4173
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/worldviewer
+
+[Install]
+WantedBy=multi-user.target
