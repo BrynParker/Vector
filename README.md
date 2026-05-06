@@ -77,3 +77,27 @@ The app is served through Nginx on port `80`, with `/ws` proxied to the WebSocke
 - OSM traffic particle layer.
 - Austin CCTV catalog + stream projection layer.
 - Post-process shader chain (CRT/NVG/FLIR/Anime as true shader passes).
+
+## Ubuntu Version Recommendation (as of 2026-05-06)
+
+If choosing from:
+
+1. Ubuntu 22.04 LTS (Jammy)
+2. Ubuntu 24.04 LTS (Noble)
+3. Ubuntu 25.10 (Questing Quokka)
+4. Ubuntu 26.04 LTS (Resolute Raccoon)
+
+**Best default choice for this project: Ubuntu 26.04 LTS.**
+
+Why:
+
+- It is the latest LTS release (released April 23, 2026), so you get the newest stable kernel/userspace with long-term support.
+- It avoids interim-release churn from 25.10 while being newer than 24.04.
+- It gives the longest forward maintenance runway for a new deployment.
+
+When to choose 24.04 instead:
+
+- If your cloud provider image catalog or internal compliance baseline has not yet fully validated 26.04.
+- If a vendor driver/toolchain you require explicitly certifies 24.04 but not yet 26.04.
+
+Avoid 25.10 for production unless you specifically need an interim-only feature.
