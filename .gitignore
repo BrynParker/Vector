@@ -19,3 +19,12 @@ coverage/
 Thumbs.db
 .vscode/
 .idea/
+
+# Local workspace configuration
+AGENTS.md
+CLAUDE.md
+.codex/
+.claude/
+.cursor/
+.copilot/
+.github/copilot-instructions.md
