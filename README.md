@@ -87,3 +87,5 @@ python scripts/package-release.py /path/outside/project/Vector-Pterodactyl.zip
 ```
 
 The packager uses an explicit file allowlist, includes installed production dependencies, preserves Linux shell permissions/line endings, and writes a per-file SHA-256 manifest plus an archive checksum. It excludes local secrets, cache, logs, Git history, and design working files. Scan the finished release before publishing it.
+
+Rendering optimizations and reproducible measurements are documented in [performance notes](docs/PERFORMANCE.md). Run `npm run benchmark` for the isolated marker sampling benchmark.

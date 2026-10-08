@@ -1,6 +1,6 @@
 // Geographic interpolation and bounded telemetry prediction. No network or renderer dependency.
 export function wrapLongitude(value) { return ((value+180)%360+360)%360-180; }
-export function sampleMotion(record, now) {
+export function sampleMotion(record, now, result = {}) {
   const m = record?.motion;
   if (!m?.from || !m?.to || !Number.isFinite(m.toTs)) return null;
   const span = Math.max(1, Number(m.toTs) - Number(m.fromTs));
@@ -11,7 +11,7 @@ export function sampleMotion(record, now) {
   const lat = Number(m.from.lat) + (Number(m.to.lat) - Number(m.from.lat)) * ease;
   const altitudeM =
     Number(m.from.altitudeM) + (Number(m.to.altitudeM) - Number(m.from.altitudeM)) * ease;
-  let result = { lon, lat, altitudeM };
+  result.lon = lon; result.lat = lat; result.altitudeM = altitudeM;
   if (tRaw > 1 && record.velocity && (record.layer === "aircraft" || record.layer === "maritime")) {
     const seconds = Math.min(15, (now - m.toTs) / 1000);
     const bearing = record.velocity.heading * Math.PI / 180;
@@ -19,7 +19,7 @@ export function sampleMotion(record, now) {
     const phi=lat*Math.PI/180;
     const nextLat=Math.asin(Math.sin(phi)*Math.cos(distance)+Math.cos(phi)*Math.sin(distance)*Math.cos(bearing));
     const nextLon=lon*Math.PI/180+Math.atan2(Math.sin(bearing)*Math.sin(distance)*Math.cos(phi),Math.cos(distance)-Math.sin(phi)*Math.sin(nextLat));
-    result = { lon: wrapLongitude(nextLon*180/Math.PI), lat: nextLat*180/Math.PI, altitudeM };
+    result.lon = wrapLongitude(nextLon*180/Math.PI); result.lat = nextLat*180/Math.PI;
   }
   return result;
 }

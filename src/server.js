@@ -51,7 +51,11 @@ app.use(
     etag: true,
     lastModified: true,
     maxAge: 0,
-    setHeaders: (res) => {
+    setHeaders: (res, filePath) => {
+      if (filePath.startsWith(path.join(publicDir, "assets") + path.sep)) {
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        return;
+      }
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");

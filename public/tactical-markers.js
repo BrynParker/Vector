@@ -49,7 +49,13 @@ export function registerTacticalMarker(entity, glyph, color, timestamp) {
  symbol.timestamp=timestamp;
 }
 export function initTacticalInteraction(viewer) {
- let selected, hovered, lastPick = 0, lastAgeCheck=0;
+ let selected, hovered, lastPick = 0, lastAgeCheck=0, dragging=false, moving=false;
+ viewer.camera.moveStart.addEventListener(() => { moving=true; });
+ viewer.camera.moveEnd.addEventListener(() => { moving=false; });
+ viewer.canvas.addEventListener('pointerdown', () => { dragging=true; });
+ window.addEventListener('pointerup', () => { dragging=false; });
+ window.addEventListener('pointercancel', () => { dragging=false; });
+ window.addEventListener('blur', () => { dragging=false; });
  function paint(entity, state) {
    const symbol = entity && symbols.get(entity);
    if (!symbol || !entity.billboard) return;
@@ -70,6 +76,7 @@ export function initTacticalInteraction(viewer) {
    paint(selected,''); selected=picked; paint(selected,'selected');
  },Cesium.ScreenSpaceEventType.LEFT_CLICK);
  handler.setInputAction(event => {
+   if(dragging || moving || event.buttons) return;
    if(performance.now()-lastPick<70) return; lastPick=performance.now();
    const picked=viewer.scene.pick(event.endPosition)?.id;
    if(picked===hovered) return;

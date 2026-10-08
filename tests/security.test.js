@@ -50,7 +50,8 @@ test('HTTP and WebSocket security preserve isolated visitor state', {timeout:300
   assert.ok(health.headers.get('content-security-policy').includes("object-src 'none'"));
   assert.equal((await fetch(base+'/readyz')).status,200,'No optional keys required to boot');
   for(const file of ['/.env.production','/package.json','/data/.session-key','/src/server.js','/logs/vector-runtime.log']) assert.equal((await fetch(base+file)).status,404);
-  assert.equal((await fetch(base+'/app.js')).status,200);
+  const appScript=await fetch(base+'/app.js');assert.equal(appScript.status,200);assert.ok(appScript.headers.get('cache-control').includes('no-store'));
+  const tile=await fetch(base+'/assets/earth-realistic/0/0/0.jpg');assert.equal(tile.status,200);assert.equal(tile.headers.get('cache-control'),'public, max-age=3600');
   const bootA=await fetch(base+'/api/config'), bootB=await fetch(base+'/api/config');
   const cookieA=bootA.headers.get('set-cookie').split(';')[0], cookieB=bootB.headers.get('set-cookie').split(';')[0];
   assert.notEqual(cookieA,cookieB);assert.ok(bootA.headers.get('set-cookie').includes('HttpOnly'));

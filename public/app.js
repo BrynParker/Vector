@@ -1,4 +1,5 @@
-import { sampleMotion } from "./tactical-motion.js";
+import { initRenderBudget } from "./render-budget.js";
+import { sampleCachedMotion, updateStemPositions, oncePerFrame, sampleOrbitSegment } from "./render-performance.js";
 import { renderPrecision, renderAssetSummary, renderNearbySummary, styleRiskChart, initPrecision, updatePrecisionTimeline } from "./precision.js";
 import { initWorkspace } from "./workspace.js";
 import { tacticalGlyph, headingBetween, registerTacticalMarker, initTacticalInteraction } from "./tactical-markers.js";
@@ -64,6 +65,7 @@ viewer.scene.skyAtmosphere.brightnessShift = 0.25;
 viewer.scene.skyAtmosphere.saturationShift = 0.2;
 viewer.scene.postProcessStages.fxaa.enabled = true;
 const globeAppearance = initGlobeAppearance(viewer);
+initRenderBudget(viewer);
 const syncEarthMode = initTacticalGlobe(viewer, mode => setGlobeRenderMode(mode));
 viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(-42, 37, 14500000), orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 } });
 const modeSelect = document.getElementById("modeSelect");
@@ -820,7 +822,10 @@ function ensureCharts() {
   }
 }
 
-function updateKpisAndCharts() {
+const scheduleKpiRefresh = oncePerFrame(() => renderKpisAndCharts());
+function updateKpisAndCharts() { scheduleKpiRefresh(); }
+
+function renderKpisAndCharts() {
   updateAircraftLimitLabel();
   kpiFlights.textContent = String(liveTotals.aircraft || liveSnapshot.aircraft.length || 0);
   kpiSatellites.textContent = String(liveTotals.satellites || liveSnapshot.satellites.length || 0);
@@ -931,7 +936,9 @@ function normalizeLonDelta(delta) {
   return d;
 }
 
-function getRecordMotionPoint(record, now = getAnimationClockMs()) { return sampleMotion(record,now); }
+let animationFrameTime;
+viewer.scene.preUpdate.addEventListener(() => { animationFrameTime = getAnimationClockMs(); });
+function getRecordMotionPoint(record, now = animationFrameTime ?? getAnimationClockMs()) { return sampleCachedMotion(record, now); }
 
 function seedMotion(record, item, altitudeM) {
   const lon = Number(item.lon);
@@ -1536,7 +1543,9 @@ function createLiftedMarkerEntity(layer, item, idPrefix, labelText) {
   const rootId = `${idPrefix}-${item.id}`;
   removeEntityById(`${rootId}-stem`);
   removeEntityById(rootId);
+  const moving = layer === "aircraft" || layer === "maritime";
   const record = {
+    moving,
     lat: Number(item.lat),
     lon: Number(item.lon),
     layer,
@@ -1554,36 +1563,23 @@ function createLiftedMarkerEntity(layer, item, idPrefix, labelText) {
   record.stem = viewer.entities.add({
       id: `${rootId}-stem`,
       polyline: {
-        positions: new Cesium.CallbackProperty(() => {
-          const p = getRecordMotionPoint(record);
-          if (!p) return [];
-          return Cesium.Cartesian3.fromDegreesArrayHeights([
-            p.lon,
-            p.lat,
-            0,
-            p.lon,
-            p.lat,
-            p.altitudeM
-          ]);
-        }, false),
+        positions: moving ? new Cesium.CallbackProperty(() => {
+          const point = getRecordMotionPoint(record);
+          return point ? updateStemPositions(record, point, Cesium) : [];
+        }, false) : Cesium.Cartesian3.fromDegreesArrayHeights([Number(item.lon), Number(item.lat), 0, Number(item.lon), Number(item.lat), style.altitudeM]),
         width: (layer === "downdetector" ? 2.25 : 1.4) * Math.max(0.75, getLayerScale(layer)),
         material: strokeColor
       }
     });
   record.cap = viewer.entities.add({
       id: rootId,
-      position: new Cesium.CallbackProperty(() => {
-        const p = getRecordMotionPoint(record);
-        if (!p) return Cesium.Cartesian3.fromDegrees(Number(item.lon), Number(item.lat), style.altitudeM);
-        return Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.altitudeM, Cesium.Ellipsoid.WGS84, record.cartesian);
-      }, false),
+      position: moving ? new Cesium.CallbackProperty(() => {
+        const point = getRecordMotionPoint(record);
+        return Cesium.Cartesian3.fromDegrees(point.lon, point.lat, point.altitudeM, Cesium.Ellipsoid.WGS84, record.cartesian);
+      }, false) : Cesium.Cartesian3.fromDegrees(Number(item.lon), Number(item.lat), style.altitudeM),
       billboard: {
         image: buildGlyphSvg(style.glyph, billboardColorHex),
-        rotation: new Cesium.CallbackProperty(() => {
-          if (layer !== "aircraft") return 0;
-          const m=record.motion; const h=record.velocity?.heading;
-          return -(Number.isFinite(h) ? h*Math.PI/180 : m ? headingBetween(m.from,m.to) : 0);
-        }, false),
+        rotation: 0,
         alignedAxis: layer === "aircraft" ? Cesium.Cartesian3.UNIT_Z : Cesium.Cartesian3.ZERO,
         scale: style.capScale,
         color: Cesium.Color.WHITE.withAlpha(getLayerOpacity()),
@@ -1632,6 +1628,14 @@ function setLiftedMarkerPosition(record, layer, item, labelText) {
         ? MOTION_BLEND_MS.maritime
         : MOTION_BLEND_MS.aircraft;
   updateMotion(record, item, style.altitudeM, blendMs);
+  if (!record.moving) {
+    record.cap.position.setValue(Cesium.Cartesian3.fromDegrees(Number(item.lon), Number(item.lat), style.altitudeM, Cesium.Ellipsoid.WGS84, record.cartesian));
+    record.stem.polyline.positions.setValue(Cesium.Cartesian3.fromDegreesArrayHeights([Number(item.lon), Number(item.lat), 0, Number(item.lon), Number(item.lat), style.altitudeM]));
+  }
+  if (layer === "aircraft") {
+    const heading = record.velocity?.heading;
+    record.cap.billboard.rotation = -(Number.isFinite(heading) ? heading * Math.PI / 180 : headingBetween(record.motion.from, record.motion.to));
+  }
   registerTacticalMarker(record.cap, style.glyph, style.color.toCssColorString(), item.timestamp);
   if (record.cap?.label) {
     const denseAircraft = layer === "aircraft" && Number(liveTotals.aircraft || 0) > 2200;
@@ -1784,7 +1788,7 @@ function updateSatellites(items = []) {
       entityMaps.satellites,
       entityId,
       () => {
-        const record = { layer: "satellites", orbitTrack: closedTrack, cartesian: new Cesium.Cartesian3(), point: null, path: null, stem: null };
+        const record = { layer: "satellites", samplePhase: hashString(entityId) % 1000, orbitTrack: closedTrack, cartesian: new Cesium.Cartesian3(), point: null, path: null, stem: null };
         removeEntityById(`sat-${entityId}`);
         removeEntityById(`sat-path-${entityId}`);
         removeEntityById(`sat-stem-${entityId}`);
@@ -1815,17 +1819,15 @@ function updateSatellites(items = []) {
           position: new Cesium.CallbackProperty(() => {
             const clock = getAnimationClockMs();
             if (record.satrec) {
-              const second = Math.floor(clock/1000);
-              if (record.sampleSecond !== second) {
-                const sample = time => {
-                  const pv=satellite.propagate(record.satrec,new Date(time));
-                  if (!pv.position) return null;
-                  const geo=satellite.eciToGeodetic(pv.position,satellite.gstime(new Date(time)));
-                  return Cesium.Cartesian3.fromRadians(geo.longitude,geo.latitude,geo.height*1000);
-                };
-                record.sampleA=sample(second*1000); record.sampleB=sample((second+1)*1000); record.sampleSecond=second;
-              }
-              if(record.sampleA && record.sampleB) return Cesium.Cartesian3.lerp(record.sampleA,record.sampleB,(clock%1000)/1000,record.cartesian);
+              record.sampleOrbit ||= time => {
+                const date = new Date(time);
+                const pv = satellite.propagate(record.satrec, date);
+                if (!pv.position) return null;
+                const geo = satellite.eciToGeodetic(pv.position, satellite.gstime(date));
+                return Cesium.Cartesian3.fromRadians(geo.longitude, geo.latitude, geo.height * 1000);
+              };
+              const segment = sampleOrbitSegment(record, clock, record.sampleOrbit);
+              if (segment.a && segment.b) return Cesium.Cartesian3.lerp(segment.a, segment.b, segment.t, record.cartesian);
             }
             const point=getRecordMotionPoint(record) || normalizedItem;
             return Cesium.Cartesian3.fromDegrees(point.lon,point.lat,point.altitudeM || 420000,Cesium.Ellipsoid.WGS84,record.cartesian);
@@ -2134,7 +2136,7 @@ function updateWeatherAlerts(items = []) {
   }
 }
 
-function interpolatePoint(coords, t) {
+function interpolatePoint(coords, t, result = []) {
   const n = coords.length;
   if (n === 1) return coords[0];
   const scaled = Math.min(n - 1, Math.max(0, t * (n - 1)));
@@ -2142,7 +2144,8 @@ function interpolatePoint(coords, t) {
   const frac = scaled - i;
   const a = coords[i];
   const b = coords[Math.min(i + 1, n - 1)];
-  return [a[0] + (b[0] - a[0]) * frac, a[1] + (b[1] - a[1]) * frac, (a[2] || 5) + ((b[2] || 5) - (a[2] || 5)) * frac];
+  result[0] = a[0] + (b[0] - a[0]) * frac; result[1] = a[1] + (b[1] - a[1]) * frac; result[2] = (a[2] || 5) + ((b[2] || 5) - (a[2] || 5)) * frac;
+  return result;
 }
 
 function updateTraffic(items = []) {
@@ -2173,20 +2176,19 @@ function updateTraffic(items = []) {
 
 function animateTraffic() {
   const t = getAnimationClockMs() * 0.00015;
-  if (displayPaused || !layerVisibility.traffic || document.hidden) { requestAnimationFrame(animateTraffic); return; }
+  if (displayPaused || !layerVisibility.traffic || document.hidden) return;
   for (const p of trafficLayer.particles) {
     const phase = (p.phase + t * p.speedNorm) % 1;
-    const pos = interpolatePoint(p.coordinates, phase);
+    const pos = interpolatePoint(p.coordinates, phase, p.positionScratch ||= []);
     Cesium.Cartesian3.fromDegrees(pos[0],pos[1],pos[2]||5,Cesium.Ellipsoid.WGS84,p.cartesian);
     p.entity.position.setValue(p.cartesian);
-    const ahead=interpolatePoint(p.coordinates,Math.min(.9999,phase+.002));
+    const ahead=interpolatePoint(p.coordinates,Math.min(.9999,phase+.002), p.aheadScratch ||= []);
     p.entity.billboard.rotation=-headingBetween({lon:pos[0],lat:pos[1]},{lon:ahead[0],lat:ahead[1]})+Math.PI/2;
     p.entity.billboard.alignedAxis=Cesium.Cartesian3.UNIT_Z;
     p.entity.show = layerVisibility.traffic;
   }
-  requestAnimationFrame(animateTraffic);
 }
-requestAnimationFrame(animateTraffic);
+viewer.scene.preUpdate.addEventListener(animateTraffic);
 
 function renderCategoryCatalog(category) {
   clearCategoryCatalogLayer();
@@ -2296,7 +2298,8 @@ function applyCategoryPreset(category) {
   if (currentMarker) updateContextForMarker(currentMarker);
 }
 
-function applyLayerUpdate(layer, entities) {
+function applyLayerUpdate(layer, entities, deferRefresh = false) {
+  if (!deferRefresh) viewer.entities.suspendEvents();
   try {
     if (layer === "aircraft") updateAircraft(entities);
     if (layer === "satellites") updateSatellites(entities);
@@ -2317,27 +2320,30 @@ function applyLayerUpdate(layer, entities) {
     if (layer === "power") {
       liveSnapshot.power = entities || [];
     }
-    applyLayerVisibility();
-    updateKpisAndCharts();
-    logRenderStats(`layer:${layer}`);
+    if (!deferRefresh) {
+      applyLayerVisibility();
+      updateKpisAndCharts();
+      logRenderStats(`layer:${layer}`);
+    }
   } catch (error) {
     pushDebug(`error applyLayerUpdate(${layer}) ${error?.message || error}`, { force: true });
+  } finally {
+    if (!deferRefresh) viewer.entities.resumeEvents();
   }
 }
 
 function applySnapshot(snapshot) {
-  applyLayerUpdate("aircraft", snapshot.aircraft || []);
-  applyLayerUpdate("satellites", snapshot.satellites || []);
-  applyLayerUpdate("seismic", snapshot.seismic || []);
-  applyLayerUpdate("traffic", snapshot.traffic || []);
-  applyLayerUpdate("cctv", snapshot.cctv || []);
-  applyLayerUpdate("maritime", snapshot.maritime || []);
-  applyLayerUpdate("downdetector", snapshot.downdetector || []);
-  applyLayerUpdate("news", snapshot.news || []);
-  applyLayerUpdate("weatherAlerts", snapshot.weatherAlerts || []);
-  applyLayerUpdate("cyber", snapshot.cyber || []);
-  applyLayerUpdate("financeMarkets", snapshot.financeMarkets || []);
-  applyLayerUpdate("power", snapshot.power || []);
+  viewer.entities.suspendEvents();
+  try {
+    for (const layer of ["aircraft", "satellites", "seismic", "traffic", "cctv", "maritime", "downdetector", "news", "weatherAlerts", "cyber", "financeMarkets", "power"]) {
+      applyLayerUpdate(layer, snapshot[layer] || [], true);
+    }
+    applyLayerVisibility();
+    updateKpisAndCharts();
+  } finally {
+    viewer.entities.resumeEvents();
+  }
+  logRenderStats("snapshot");
 }
 
 function clearAllDynamicLayers() {
