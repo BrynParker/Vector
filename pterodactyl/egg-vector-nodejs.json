@@ -1,0 +1,67 @@
+{
+  "_comment": "Vector: upload the release ZIP before first start. Node.js is required.",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-10-08T00:00:00+00:00",
+  "name": "Vector \u2014 Node.js",
+  "author": "noreply@vector.example.com",
+  "description": "Vector geospatial intelligence. Upload/extract the release at /home/container; optional provider keys go in private configuration.",
+  "features": null,
+  "docker_images": {
+    "Node.js 24 LTS": "ghcr.io/parkervcp/yolks:nodejs_24",
+    "Node.js 22 LTS": "ghcr.io/parkervcp/yolks:nodejs_22"
+  },
+  "file_denylist": [
+    ".env",
+    ".env.production",
+    "data/.session-key"
+  ],
+  "startup": "bash ./run.sh",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\": \"[vector] running\"}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/sh\nset -eu\nmkdir -p /mnt/server\necho \"Upload and extract the Vector release ZIP into the server root before starting.\"\n",
+      "container": "alpine:3.22",
+      "entrypoint": "sh"
+    }
+  },
+  "variables": [
+    {
+      "name": "Bind address",
+      "description": "Bind to all interfaces inside the container.",
+      "env_variable": "APP_HOST",
+      "default_value": "0.0.0.0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:64",
+      "field_type": "text"
+    },
+    {
+      "name": "Public origin",
+      "description": "Canonical HTTPS origin, such as https://vector.example.com.",
+      "env_variable": "PUBLIC_ORIGIN",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string|max:255",
+      "field_type": "text"
+    },
+    {
+      "name": "Trusted proxy",
+      "description": "Exact Nginx source IP/subnet; Docker bridge proxies may need their gateway IP. Never trust all addresses.",
+      "env_variable": "TRUST_PROXY",
+      "default_value": "loopback",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:255",
+      "field_type": "text"
+    }
+  ]
+}

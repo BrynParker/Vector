@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Vector — Real-time geospatial intelligence</title>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="/styles.css?v=vector-2" rel="stylesheet"/>
+<meta content="Vector brings aircraft, satellites, maritime activity and global intelligence into one live geospatial workspace." name="description"/><meta content="#071116" name="theme-color"/><link href="/vector-mark.svg" rel="icon" type="image/svg+xml"/><link href="/precision.css?v=vector-2" rel="stylesheet"/></head>
+<body>
+<div id="cesiumContainer"></div>
+<div aria-hidden="true" class="viewport-grid"></div>
+<div aria-hidden="true" class="viewport-noise"></div>
+<main class="command-shell">
+<header class="command-header">
+<div class="header-topline"><a aria-label="Vector home" class="brand" href="/"><img alt="" height="34" src="/vector-mark.svg" width="34"/><strong>VECTOR</strong><span>Real-Time Geospatial Intelligence</span></a><nav aria-label="Workspace" class="workspace-nav"><button class="active" data-workspace="overview">Overview</button><button data-workspace="tactical">Tactical</button><button data-workspace="operations">Operations</button><button data-workspace="map">Map</button><button data-workspace="intel">Intel</button><button data-workspace="data">Data</button><button data-workspace="firewall">Firewall</button><button data-workspace="alerts">Alerts</button><button data-workspace="attacks">Attacks</button></nav><div class="header-actions"><label class="command-search"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#search"></use></svg><input aria-label="Search callsign, asset or region" id="quickSearchInput" placeholder="Search callsign, asset, region…"/><kbd>⌘ K</kbd></label><button aria-label="Open alerts" class="icon-button notification-button" id="notificationsBtn"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#bell"></use></svg><span class="notification-dot"></span></button><button aria-label="Open display settings" id="settingsToggle" title="Display settings"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#gear"></use></svg></button><button aria-label="About Vector" class="profile-button" id="profileBtn">V</button></div></div>
+<div class="kpi-grid">
+<article class="kpi-card"><div class="risk-ring" id="riskRing"><span id="riskRingValue">—</span></div>
+<span>Composite Risk</span>
+<strong id="kpiComposite">--</strong>
+<span class="kpi-change" id="kpiChange0" title="Change since this session began">—</span><div aria-label="Session trend" class="kpi-spark" id="kpiSpark0"></div></article>
+<article class="kpi-card">
+<span>Flights</span>
+<strong id="kpiFlights">0</strong>
+<svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#plane"></use></svg><span class="kpi-change" id="kpiChange1" title="Change since this session began">—</span><div aria-label="Session trend" class="kpi-spark" id="kpiSpark1"></div></article>
+<article class="kpi-card">
+<span>Satellites</span>
+<strong id="kpiSatellites">0</strong>
+<svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#satellite"></use></svg><span class="kpi-change" id="kpiChange2" title="Change since this session began">—</span><div aria-label="Session trend" class="kpi-spark" id="kpiSpark2"></div></article>
+<article class="kpi-card">
+<span>Cyber Alerts</span>
+<strong id="kpiCyber">0</strong>
+<svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#alert"></use></svg><span class="kpi-change" id="kpiChange3" title="Change since this session began">—</span><div aria-label="Session trend" class="kpi-spark" id="kpiSpark3"></div></article>
+<article class="kpi-card">
+<span>Power Stress</span>
+<strong id="kpiPower">--</strong>
+<svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#power"></use></svg><span class="kpi-change" id="kpiChange4" title="Change since this session began">—</span><div aria-label="Session trend" class="kpi-spark" id="kpiSpark4"></div></article>
+<article class="kpi-card status-card"><span>Threat status</span><span class="status-dot"></span><strong id="threatStatus">Awaiting data</strong></article><article class="kpi-card status-card"><span>Live / WebSocket</span><span class="status-dot"></span><strong id="connectionStatus" role="status">Connecting</strong><small id="dataFreshness">Waiting for snapshot</small></article></div>
+</header>
+<section aria-label="Map controls" class="map-tools">
+<button aria-label="Home view" class="tool-btn" id="camHomeBtn" type="button"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#home"></use></svg><span>Home</span></button>
+<button aria-label="Point north" class="tool-btn" id="camNorthBtn" type="button"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#north"></use></svg><span>North</span></button>
+<button aria-label="Zoom in" class="tool-btn" id="zoomInBtn" type="button"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#plus"></use></svg><span></span></button>
+<button aria-label="Zoom out" class="tool-btn" id="zoomOutBtn" type="button"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#minus"></use></svg><span></span></button>
+<button aria-label="Real imagery" class="tool-btn active" id="globeRealBtn" type="button"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#globe"></use></svg><span></span></button>
+<button aria-label="3D view" class="tool-btn active" id="scene3dBtn" type="button">3D</button>
+<button aria-label="2D view" class="tool-btn" id="scene2dBtn" type="button">2D</button>
+</section>
+<section class="ops-panel" id="hud">
+<div class="panel-head"><div class="panel-title">Categories</div>
+<button class="sidebar-anchor" id="jumpToLayers">Layers</button>
+<button aria-label="Collapse layers panel" class="panel-collapse-btn" id="toggleLeftPanelBtn" type="button">−</button>
+<button class="active" id="layersTab" type="button">Categories</button></div>
+<div class="panel-body" id="leftPanelBody">
+<div class="section">
+<div class="label visually-hidden">Map Category</div>
+<div class="filter-grid category-grid" id="categorySwitch">
+<button class="filter-btn active" data-category="geopolitical"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#globe"></use></svg>Geopolitical</button>
+<button class="filter-btn" data-category="finance"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#finance"></use></svg>Finance</button>
+<button class="filter-btn" data-category="infrastructure"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#building"></use></svg>Infrastructure</button>
+<button class="filter-btn" data-category="environmental"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#leaf"></use></svg>Environmental</button>
+</div>
+</div>
+<div class="section">
+<div class="label visually-hidden">Dataset Layers</div>
+<div class="filter-grid" id="datasetFilters">
+<button aria-pressed="true" class="filter-btn active" data-layer="aircraft"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#plane"></use></svg><span>Aircraft</span><small data-count="aircraft">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="satellites"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#satellite"></use></svg><span>Satellites</span><small data-count="satellites">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="seismic"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#wave"></use></svg><span>Seismic</span><small data-count="seismic">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="traffic"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#traffic"></use></svg><span>Traffic</span><small data-count="traffic">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="cctv"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#camera"></use></svg><span>CCTV</span><small data-count="cctv">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="maritime"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#ship"></use></svg><span>Maritime</span><small data-count="maritime">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="downdetector"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#alert"></use></svg><span>Downdetector</span><small data-count="downdetector">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="news"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#news"></use></svg><span>News</span><small data-count="news">—</small></button>
+<button aria-pressed="true" class="filter-btn active" data-layer="weatherAlerts"><span aria-hidden="true" class="check-box">✓</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#weather"></use></svg><span>Weather alerts</span><small data-count="weatherAlerts">—</small></button>
+</div>
+</div>
+<div class="visually-hidden" id="markerInfo">Marker: click map to set focus</div>
+<div class="visually-hidden">Click map or share location to drive proximity intelligence.</div>
+</div>
+</section>
+<aside class="intel-panel" id="contextPanel">
+<div class="panel-head"><div class="panel-title"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#satellite"></use></svg><span>Satellite</span><span class="asset-active">● Waiting</span></div>
+<button aria-label="Focus selected satellite" class="icon-button" id="focusAssetBtn"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#pin"></use></svg></button>
+<button aria-label="Collapse inspector" class="panel-collapse-btn" id="toggleRightPanelBtn" type="button">×</button>
+</div>
+<div class="panel-body" id="rightPanelBody"><div class="selection-hero" title="Illustrative communications satellite asset; metadata describes the tracked object."><div><span class="eyebrow">Selected satellite</span><h2 id="selectedAssetName">Orbital overview</h2><span id="selectedAssetStatus">Select a satellite on the globe</span></div><div class="asset-badges"><span>ORBITAL OBJECT</span><span id="assetProvider">SATELLITE</span></div><div class="asset-summary" id="assetSummary"></div></div>
+<div class="right-tabs">
+<button class="tab-btn active" data-tab="context">Context</button>
+<button class="tab-btn" data-tab="cctv">CCTV</button>
+<button class="tab-btn" data-tab="investigator">Investigator</button>
+<button class="tab-btn" data-tab="feeds">Feeds</button>
+</div>
+<div class="tab-body active" data-tab-body="context"><section class="nearby-card"><header><strong>Nearby intelligence</strong><button id="viewIntelBtn">View in Intel <svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#arrow"></use></svg></button></header><div id="nearbySummary"><p class="empty-state">Select a point on the globe to load nearby intelligence.</p></div><details class="nearby-full"><summary>All nearby intelligence</summary><div id="nearbyFull"><div class="tiny" id="contextMeta">Click map to load nearby intelligence</div><div class="context-content" id="contextContent"></div></div></details></section><details class="inspector-disclosure"><summary>Selected entity details <svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#chevron"></use></svg></summary><div id="entityFull"><div class="tiny" id="entityDetailMeta">Click infrastructure markers for details.</div><div class="context-content" id="entityDetails"></div></div></details><details class="inspector-disclosure"><summary>Satellite details <svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#chevron"></use></svg></summary><div id="satelliteFull"><div class="tiny" id="satelliteMeta">Click a satellite to inspect details.</div><div class="context-content" id="satelliteDetails"></div></div></details><button class="camera-shortcut" id="cameraShortcut">CCTV (selected region)<span id="cameraShortcutCount">View cameras</span><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#expand"></use></svg></button></div>
+<div class="tab-body" data-tab-body="cctv">
+<div class="row">
+<label for="cctvRegionSelect">Region</label>
+<select id="cctvRegionSelect"></select>
+</div>
+<div class="tiny" id="cctvRegionSummary">No cameras loaded.</div>
+<div class="list-stack" id="cctvRegionList"></div>
+</div>
+<div class="tab-body" data-tab-body="investigator">
+<div class="label">Active Lookup</div>
+<div class="row">
+<select aria-label="Lookup type" id="osintTypeSelect"></select>
+</div>
+<div class="row">
+<input aria-label="Domain" id="osintDomainInput" placeholder="Domain (for DNS lookup)" type="text"/>
+</div>
+<div class="row">
+<input aria-label="IP address" id="osintIpInput" placeholder="IP (for IP lookup)" type="text"/>
+</div>
+<div class="row">
+<input aria-label="Email address" id="osintEmailInput" placeholder="Email (for breach lookup)" type="text"/>
+</div>
+<div class="row">
+<input aria-label="URL" id="osintUrlInput" placeholder="URL (reserved for URL-based lookups)" type="text"/>
+</div>
+<div class="row">
+<label for="osintRadiusInput">Radius (km)</label>
+<input id="osintRadiusInput" max="1500" min="1" type="number" value="150"/>
+</div>
+<div class="row">
+<button class="mode-btn" id="osintRunBtn">Run Lookup</button>
+<button class="mode-btn" id="osintUseMarkerBtn">Use Marker</button>
+</div>
+<pre class="terminal-output" id="osintOutput">Awaiting lookup...</pre>
+</div>
+<div class="tab-body" data-tab-body="feeds">
+<div class="label">Live News Feed</div>
+<div class="list-stack" id="feedNewsList"></div>
+<div class="label">Cyber KEV Feed</div>
+<div class="list-stack" id="feedCyberList"></div>
+</div>
+</div>
+</aside>
+<footer class="analytics-dock" id="graphDock">
+<div class="dock-head">
+<div class="visually-hidden" id="graphScopeMeta">Charts activate when you click a marker or POI.</div>
+<button class="visually-hidden" id="globalScopeBtn" type="button">Global scope</button></div>
+<div class="chart-grid">
+<div class="chart-card">
+<div class="chart-title"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#wave"></use></svg>Risk trajectory<svg aria-hidden="true" class="icon info-icon"><use href="/assets/icons.svg#info"></use></svg><select aria-label="Risk trajectory scope" class="chart-scope" data-scope-select=""><option value="global">Global</option><option value="local">Selected location</option></select><button class="chart-expand" data-expand-chart="risk" aria-label="Expand risk trajectory"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#expand"></use></svg></button></div>
+<canvas id="riskChart"></canvas>
+<div class="risk-endpoint" id="riskEndpoint"></div></div>
+<div class="chart-card">
+<div class="chart-title"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#satellite"></use></svg>Category scores<svg aria-hidden="true" class="icon info-icon"><use href="/assets/icons.svg#info"></use></svg><select aria-label="Category scores scope" class="chart-scope" data-scope-select=""><option value="global">Global</option><option value="local">Selected location</option></select></div>
+<canvas class="visually-hidden" id="categoryChart"></canvas>
+<div class="category-score-rows" id="categoryScoreRows"></div></div>
+<div class="chart-card market-card">
+<div class="chart-title"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#globe"></use></svg>Market movers<svg aria-hidden="true" class="icon info-icon"><use href="/assets/icons.svg#info"></use></svg><select aria-label="Market mover order" class="chart-scope" id="marketSort"><option value="default">Global markets</option><option value="gainers">Top gainers</option><option value="decliners">Top decliners</option></select><button class="chart-expand" data-expand-chart="markets" aria-label="Expand market movers"><svg class="icon" aria-hidden="true"><use href="/assets/icons.svg#expand"></use></svg></button></div>
+<div class="market-table" id="marketTable"><p class="empty-state">Market data is loading.</p></div><details><summary>Local activity counts</summary><div class="activity-chart"><canvas id="marketChart"></canvas></div></details></div>
+</div>
+</footer>
+<section aria-label="Timeline and location" class="transport-bar"><div id="timelineHost"><div class="section compact section-glow">
+<div class="section-head">
+<div class="label">Timeline Control</div>
+</div>
+<div class="row controls-pill"><button aria-label="Pause live display" id="transportToggle"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#pause"></use></svg></button>
+<button class="mode-btn active" id="liveBtn"><span class="live-dot"></span>Live</button>
+<button class="mode-btn" id="replayBtn">Replay 2h</button>
+<button class="visually-hidden" id="replayPlayBtn">Play</button>
+<button class="visually-hidden" id="replayPauseBtn">Pause</button>
+</div>
+<div class="row">
+<label class="visually-hidden" for="speedSelect">Speed</label>
+<select class="visually-hidden" id="speedSelect">
+<option value="0.5">0.5x</option>
+<option selected="" value="1">1x</option>
+<option value="2">2x</option>
+<option value="4">4x</option>
+<option value="8">8x</option>
+</select>
+</div>
+<div class="timeline-track"><div id="timelineTimestamp">Live timeline</div><div class="timeline-rail"></div><input aria-label="Replay time" id="replayScrubber" max="1000" min="0" type="range" value="1000"/><div class="timeline-labels" id="timelineLabels"></div></div>
+<div class="tiny" id="replayStatus">Replay idle</div>
+<div aria-label="Playback speed" class="speed-segments"><button class="" data-speed="0.5">0.5x</button><button class="active" data-speed="1">1x</button><button class="" data-speed="2">2x</button><button class="" data-speed="4">4x</button><button class="" data-speed="8">8x</button></div></div></div><div id="visualModeHost"><div class="transport-label">Visual mode</div><div class="visual-segments"><button class="active" data-visual="default">Default</button><button class="" data-visual="crt">CRT</button><button class="" data-visual="nvg">NVG</button><button class="" data-visual="flir">FLIR</button><button class="" data-visual="anime">Anime</button></div><div class="row">
+<label class="visually-hidden" for="modeSelect">Visual Mode</label>
+<select class="visually-hidden" id="modeSelect">
+<option selected="" value="default">Default</option>
+<option value="crt">CRT</option>
+<option value="nvg">NVG</option>
+<option value="flir">FLIR</option>
+<option value="anime">Anime</option>
+</select>
+</div></div><div id="locationHost"><div class="section">
+<div class="location-controls"><input aria-label="Find location" id="locationQuery" placeholder="City or coordinates…"/><button aria-label="Focus entered location" id="locateQueryBtn"><svg aria-hidden="true" class="icon"><use href="/assets/icons.svg#target"></use></svg></button></div><div class="label">Location</div>
+<div class="tiny" id="locationStatus">Location not shared yet.</div>
+<div class="row">
+<button class="mode-btn" id="shareLocationBtn">Share</button>
+<button class="mode-btn" id="refreshLocationBtn">Refresh</button>
+<button class="mode-btn" id="clearLocationBtn">Clear</button>
+</div>
+</div></div></section><dialog aria-labelledby="settingsTitle" id="displaySettings"><header><h2 id="settingsTitle">Display settings</h2><button aria-label="Close display settings" id="settingsClose">×</button></header><div id="tuningHost"><div class="section tuning-section">
+<div class="label">Display Tuning</div>
+<div class="toggle-stack">
+<label class="toggle-row"><input id="satOrbitToggle" type="checkbox"/> Satellite Arcs</label>
+<label class="toggle-row"><input id="satStemToggle" type="checkbox"/> Satellite Ground Stems</label>
+<label class="toggle-row"><input checked="" id="overviewDeclutter" type="checkbox"/> Declutter markers at world scale</label></div>
+<div class="row">
+<label for="labelDensitySelect">Label Density</label>
+<select id="labelDensitySelect">
+<option value="auto">Auto</option>
+<option value="full">Full</option>
+<option selected="" value="minimal">Minimal</option>
+</select>
+</div>
+<div class="row">
+<label for="markerOpacitySlider">Marker Visibility</label>
+<input id="markerOpacitySlider" max="100" min="35" type="range" value="100"/>
+<span class="tiny" id="markerOpacityLabel">100%</span>
+</div>
+<div class="slider-grid">
+<label for="markerScaleGlobal">Global Marker Size</label>
+<input id="markerScaleGlobal" max="170" min="60" type="range" value="100"/>
+<span class="tiny" id="markerScaleGlobalLabel">100%</span>
+<label for="markerScaleAircraft">Aircraft Size</label>
+<input id="markerScaleAircraft" max="190" min="60" type="range" value="100"/>
+<span class="tiny" id="markerScaleAircraftLabel">100%</span>
+<label for="markerScaleSatellites">Satellite Size</label>
+<input id="markerScaleSatellites" max="220" min="60" type="range" value="120"/>
+<span class="tiny" id="markerScaleSatellitesLabel">120%</span>
+<label for="markerScaleMaritime">Maritime Size</label>
+<input id="markerScaleMaritime" max="190" min="60" type="range" value="100"/>
+<span class="tiny" id="markerScaleMaritimeLabel">100%</span>
+<label for="markerScaleInfrastructure">Infrastructure Size</label>
+<input id="markerScaleInfrastructure" max="190" min="60" type="range" value="100"/>
+<span class="tiny" id="markerScaleInfrastructureLabel">100%</span>
+<label for="markerScaleEnvironmental">Environmental Size</label>
+<input id="markerScaleEnvironmental" max="190" min="60" type="range" value="100"/>
+<span class="tiny" id="markerScaleEnvironmentalLabel">100%</span>
+</div>
+</div><div id="densitySettings"><div class="section">
+<div class="label">Aircraft Density</div>
+<input aria-label="Aircraft density" id="viewRadiusSlider" max="100" min="0" type="range" value="8"/>
+<div class="tiny" id="viewRadiusLabel">ALL AIRCRAFT</div>
+</div></div><div class="section"><div class="label">Globe surface</div><div class="row"><button id="surfaceRealBtn" type="button">Satellite imagery</button><button aria-label="Flat globe" class="mode-btn" id="globeFlatBtn" type="button">Flat surface</button></div></div></div></dialog></main>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="/app.js?v=vector-2" type="module"></script>
+<div class="workspace-notice" hidden="" id="workspaceNotice" role="status"></div></body>
+</html>
